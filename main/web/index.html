@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Network Goblin</title>
+<style>
+:root{--bg:#0b120e;--card:#131e18;--line:#223329;--tx:#e6f3de;--dim:#8aa393;--g:#6ce046;--a:#ffb030;--r:#ff4a4a;--c:#3ff0ff;--p:#b070ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:560px;margin:0 auto;padding:14px 14px 40px}
+h1{font-size:22px;margin:4px 0 0}h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+.sub{color:var(--dim);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
+.row{display:flex;gap:10px;align-items:center}.sp{flex:1}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:#0e1712;border-radius:10px;padding:8px;text-align:center}.stat b{display:block;font-size:18px}.stat span{font-size:11px;color:var(--dim)}
+.bar{height:10px;border-radius:6px;background:#233129;overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%;border-radius:6px}
+button{background:#2a4a1e;color:var(--tx);border:1px solid #3f6b2c;border-radius:10px;padding:9px 14px;font:inherit;font-weight:600;cursor:pointer}
+button:active{transform:scale(.97)}button.alt{background:#1a2620;border-color:var(--line)}button.warn{background:#4a1e1e;border-color:#6b2c2c}
+button.sm{padding:4px 9px;font-size:13px;border-radius:8px}
+input,select{background:#0e1712;color:var(--tx);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;width:100%}
+label{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+canvas{width:100%;height:90px;display:block}
+.dev{border-top:1px solid var(--line);padding:9px 0}.dev:first-child{border-top:0}
+.pill{font-size:11px;padding:2px 7px;border-radius:9px;background:#233129;color:var(--dim);margin-left:4px}
+.pill.new{background:#4a3a10;color:var(--a)}.pill.on{background:#1f3a18;color:var(--g)}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#2a4a1e;padding:10px 16px;border-radius:12px;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:12px}
+.hide{display:none}
+details summary{cursor:pointer;color:var(--dim)}
+</style></head><body><main>
+
+<div class="row">
+  <canvas id="gob" width="32" height="32" style="width:64px;height:64px;image-rendering:pixelated"></canvas>
+  <div class="sp"><h1 id="name">Network Goblin</h1><div class="sub" id="title">...</div></div>
+  <div style="text-align:right"><div id="lv" style="font-size:24px;font-weight:800;color:var(--g)">Lv -</div><div class="sub" id="fw"></div></div>
+</div>
+
+<div class="card hide" id="setupCard">
+  <h2>Set up Wi-Fi</h2>
+  <div class="sub">Pick the network your goblin should guard.</div>
+  <label>Network</label><div class="row"><select id="ssidSel"></select><button class="alt sm" onclick="wscan()">Rescan</button></div>
+  <label>Or type it</label><input id="ssid" placeholder="SSID">
+  <label>Password</label><input id="pass" type="password" placeholder="(blank if open)">
+  <div style="margin-top:12px"><button onclick="joinWifi()">Connect</button> <span id="wmsg" class="sub"></span></div>
+</div>
+
+<div class="card">
+  <h2>Network mood</h2>
+  <div class="stats">
+    <div class="stat"><b id="sPing">-</b><span>internet ms</span></div>
+    <div class="stat"><b id="sGw">-</b><span>router ms</span></div>
+    <div class="stat"><b id="sLoss">-</b><span>loss</span></div>
+    <div class="stat"><b id="sRssi">-</b><span>wifi dBm</span></div>
+  </div>
+  <canvas id="chart" width="520" height="90" style="margin-top:10px"></canvas>
+  <div class="sub" id="netline" style="margin-top:6px"></div>
+</div>
+
+<div class="card">
+  <h2>Goblin care</h2>
+  <div class="row"><span>Food</span><span class="sp"></span><span id="tFood" class="sub"></span></div>
+  <div class="bar"><i id="bFood" style="background:var(--a)"></i></div>
+  <div class="row"><span>Happiness</span><span class="sp"></span><span id="tHappy" class="sub"></span></div>
+  <div class="bar"><i id="bHappy" style="background:var(--p)"></i></div>
+  <div class="row"><span>XP</span><span class="sp"></span><span id="tXp" class="sub"></span></div>
+  <div class="bar"><i id="bXp" style="background:var(--c)"></i></div>
+  <div class="row"><button onclick="act('feed')">Feed a cookie</button><button class="alt" id="patBtn" onclick="act('pat')">Pat</button></div>
+  <div class="sub" id="petstats" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+  <div class="row"><h2 class="sp" style="margin:0">Devices on the LAN</h2><button class="alt sm" onclick="act('scan')">Scan now</button></div>
+  <div class="sub" id="devsum" style="margin:6px 0 4px"></div>
+  <div id="devs"></div>
+  <div class="row" style="margin-top:10px"><button class="alt sm" onclick="devAll('approve_all')">Approve all</button><span class="sp"></span><button class="warn sm" onclick="if(confirm('Forget every device? The next scan becomes the new baseline.'))devAll('forget_all')">Forget all</button></div>
+</div>
+
+<div class="card">
+  <h2>Outage log</h2>
+  <div id="outs" class="sub">No outages. Nice.</div>
+</div>
+
+<div class="card">
+  <details><summary>Settings</summary>
+  <div class="grid2">
+    <div><label>Goblin name</label><input id="cName" maxlength="19"></div>
+    <div><label>Ping target</label><input id="cPing"></div>
+    <div><label>Bedtime (hour)</label><input id="cSs" type="number" min="0" max="23"></div>
+    <div><label>Wake up (hour)</label><input id="cSe" type="number" min="0" max="23"></div>
+    <div><label>Brightness %</label><input id="cBr" type="number" min="5" max="100"></div>
+    <div><label>Night brightness %</label><input id="cNb" type="number" min="0" max="100"></div>
+    <div><label>LAN scan every (min, 0=off)</label><input id="cScan" type="number" min="0" max="240"></div>
+    <div><label>"Slow" ping threshold ms</label><input id="cSlow" type="number" min="30" max="2500"></div>
+  </div>
+  <label>Time zone (POSIX TZ)</label><select id="cTz">
+    <option value="EST5EDT,M3.2.0,M11.1.0">US Eastern</option>
+    <option value="CST6CDT,M3.2.0,M11.1.0">US Central</option>
+    <option value="MST7MDT,M3.2.0,M11.1.0">US Mountain</option>
+    <option value="MST7">US Arizona</option>
+    <option value="PST8PDT,M3.2.0,M11.1.0">US Pacific</option>
+    <option value="GMT0BST,M3.5.0/1,M10.5.0">UK</option>
+    <option value="CET-1CEST,M3.5.0,M10.5.0/3">Central Europe</option>
+    <option value="UTC0">UTC</option>
+  </select>
+  <label><input id="cInv" type="checkbox" style="width:auto"> Invert backlight (tick if brightness works backwards)</label>
+  <div style="margin-top:12px" class="row"><button onclick="saveCfg()">Save</button><span class="sp"></span><button class="alt sm" onclick="showWifi()">Change Wi-Fi</button></div>
+  </details>
+</div>
+
+<div class="card">
+  <details><summary>Firmware update &amp; system</summary>
+  <div class="sub" style="margin:8px 0">Upload a new <span class="mono">goblin_buddy.bin</span>, no USB needed.</div>
+  <input type="file" id="fwf" accept=".bin">
+  <div class="row" style="margin-top:10px"><button onclick="upd()">Upload &amp; install</button><span id="umsg" class="sub"></span></div>
+  <div class="sub mono" id="sys" style="margin-top:12px"></div>
+  <div style="margin-top:10px"><button class="warn sm" onclick="if(confirm('Reboot the goblin?'))act('reboot')">Reboot</button></div>
+  </details>
+</div>
+
+</main><div class="toast" id="toast"></div>
+<script>
+const $=id=>document.getElementById(id);
+let ST={},DEV=[];
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
+async function j(u,o){const r=await fetch(u,o);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function post(u,b){return j(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})})}
+function ago(t){if(!ST.have_time||!t)return'';let s=ST.now-t;if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago'}
+function dur(s){if(!s)return'ongoing';if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m '+s%60+'s';return Math.floor(s/3600)+'h '+Math.floor(s%3600/60)+'m'}
+function when(t){if(!ST.have_time)return'';return new Date(t*1000).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+// tiny pixel goblin for the header
+(function(){const rows=/*ROWS*/["................................", "................................", "..........KKKKKKKKKKKK..........", "........KKGGGGGGGGGGGGKK........", "K......KGGGLLGGGGGGLLGGGK......K", "KK....KGGLLGGGGGGGGGGLLGGK....KK", "KgK..KGGLGGGGGGGGGGGGGGLGGK..KgK", "KggK.KGGGGGGGGGGGGGGGGGGGGK.KggK", ".KggKGGGGGGGGGGGGGGGGGGGGGGKggK.", ".KGggGGGGGGGGGGGGGGGGGGGGGGggGK.", "..KGgGGGGGGGGGGGGGGGGGGGGGGgGK..", "...KKGGGKKKGGGGGGGGGGKKKGGGKK...", ".....KGKGGGKGGGGGGGGKGGGKGK.....", ".....KGGGGGGGGGGGGGGGGGGGGK.....", ".....KgGGKGGGGGggGGGGGKGGgK.....", "......KgGGKKKKKKKKKKKKGGgK......", ".......KgGKWPPPPPPPPWKGgK.......", "........KKgKKKKKKKKKKgKK........", "..........KKKKGGGGKKKK..........", "............KKGGGGKK............", "........KKKKbbKGGKbbKKKK........", ".......KbbbbbbbKKbbbbbbbK.......", "......KGKbKKKKKKKKKKKKbKGK......", "......KGKbKCCCCCCCCCCKbKGK......", ".....KGKKKKCcCCCCCcCCKKKKGK.....", ".....KGKGGKCCcCCCcCcCKGGKGK.....", ".....KGKGGKCCCcCcCCCCKGGKGK.....", "......KKKKKCCCCCCCCCCKKKKK......", ".......KddKKKKKKKKKKKKddK.......", "........KbbbKKKKKKKKbbbK........", "........KgggK......KgggK........", ".......KKKKKK......KKKKKK......."]/*END*/;
+const P=/*PAL*/{"K": "#141814", "G": "#5cb338", "g": "#3a7a25", "L": "#9ae05e", "R": "#ff2a2a", "W": "#f4f4e8", "P": "#6e1422", "b": "#6b4a2b", "C": "#3ff0ff", "c": "#1a90a0", "d": "#45301c", "T": "#e05a78", "Y": "#ffd040", "B": "#6ac8ff", "O": "#c88a4a"}/*END*/;
+const x=$('gob').getContext('2d');rows.forEach((r,y)=>[...r].forEach((ch,i)=>{if(P[ch]){x.fillStyle=P[ch];x.fillRect(i,y,1,1)}}))})();
+
+function drawChart(){
+  const c=$('chart'),x=c.getContext('2d'),W=c.width,H=c.height,h=ST.hist||[];
+  x.clearRect(0,0,W,H);x.fillStyle='#0e1712';x.fillRect(0,0,W,H);
+  let mx=Math.max(100,...h);mx=Math.min(mx,500);
+  const bw=W/60;
+  x.strokeStyle='#223329';x.beginPath();const sy=H-(ST.slow/mx)*(H-6)-3;if(sy>0){x.moveTo(0,sy);x.lineTo(W,sy);x.stroke()}
+  h.forEach((v,i)=>{const X=W-(h.length-i)*bw;if(v<0){x.fillStyle='#6b1a1a';x.fillRect(X,2,bw-2,H-4);return}
+    const bh=Math.max(2,Math.min(H-6,v/mx*(H-6)));x.fillStyle=v>ST.slow?'#ffb030':'#6ce046';x.fillRect(X,H-3-bh,bw-2,bh)});
+}
+
+function render(){
+  const s=ST,p=s.pet||{};
+  $('name').textContent=s.name||'Network Goblin';$('title').textContent=p.title||'';
+  $('lv').textContent='Lv '+(p.level||'-');$('fw').textContent='fw '+s.fw;
+  $('setupCard').classList.toggle('hide',!(s.setup||showWifiCard));
+  $('sPing').textContent=s.ping>=0?s.ping:'LOST';$('sPing').style.color=s.ping<0?'var(--r)':s.ping>s.slow?'var(--a)':'var(--g)';
+  $('sGw').textContent=s.gw_ping>=0?s.gw_ping:'-';$('sLoss').textContent=s.loss+'%';$('sRssi').textContent=s.wifi?s.rssi:'-';
+  const mood=!s.wifi?'<span class="dot" style="background:var(--p)"></span>No Wi-Fi':!s.inet?'<span class="dot" style="background:var(--r)"></span>Internet is DOWN':s.ping>s.slow||s.loss>=15?'<span class="dot" style="background:var(--a)"></span>Sluggish':'<span class="dot" style="background:var(--g)"></span>All good';
+  $('netline').innerHTML=mood+' &middot; '+esc(s.ssid||'')+' &middot; me '+esc(s.ip||'-')+' &middot; router '+esc(s.gw||'-');
+  drawChart();
+  $('bFood').style.width=p.hunger+'%';$('tFood').textContent=p.hunger+'%';
+  $('bHappy').style.width=p.happy+'%';$('tHappy').textContent=p.happy+'%';
+  $('bXp').style.width=Math.min(100,p.xp/p.xp_next*100)+'%';$('tXp').textContent=p.xp+' / '+p.xp_next;
+  $('petstats').innerHTML=`Cookies eaten <b>${p.feeds}</b> &middot; pats <b>${p.pats}</b> &middot; new faces spotted <b>${p.found}</b> &middot; outages survived <b>${p.survived}</b>`+(p.born&&s.have_time?` &middot; hatched ${when(p.born)}`:'');
+  $('devsum').textContent=`${s.online} online, ${s.devices} remembered`+(s.unknown?`, ${s.unknown} not approved`:'')+(s.scanning?' - scanning...':s.last_scan?' - last scan '+ago(s.last_scan):'');
+  const o=s.outages||[];
+  $('outs').innerHTML=o.length?o.map(x=>`<div class="row"><span>${when(x.start)||'(before clock sync)'}</span><span class="sp"></span><b style="color:${x.dur?'var(--tx)':'var(--r)'}">${dur(x.dur)}</b></div>`).join(''):'No outages. Nice.';
+  $('sys').textContent=`uptime ${dur(s.uptime)} · free heap ${s.heap} B (lowest ${s.min_heap}) · screen ${s.render_ms} ms/frame`;
+}
+
+function renderDevs(){
+  const d=[...DEV].sort((a,b)=>(a.known-b.known)||(b.online-a.online)||(b.last-a.last));
+  $('devs').innerHTML=d.map(x=>`<div class="dev"><div class="row"><div class="sp"><b>${esc(x.name||x.ip)}</b>${x.online?'<span class="pill on">online</span>':''}${x.known?'':'<span class="pill new">new</span>'}${x.random?'<span class="pill">private MAC</span>':''}
+    <div class="sub mono">${esc(x.ip)} &middot; ${esc(x.mac)}</div><div class="sub">first seen ${ago(x.first)||'-'}, last ${ago(x.last)||'-'}</div></div>
+    <div style="display:flex;flex-direction:column;gap:5px">${x.known?'':`<button class="sm" onclick="dev('${x.mac}',{known:true})">Approve</button>`}
+    <button class="alt sm" onclick="ren('${x.mac}')">Name</button></div></div></div>`).join('')||'<div class="sub">No devices yet. The first scan runs a few seconds after it joins Wi-Fi.</div>';
+}
+
+async function poll(){try{ST=await j('/api/state');render()}catch(e){}}
+async function pollDev(){try{const d=await j('/api/devices');if(Array.isArray(d)){DEV=d;renderDevs()}}catch(e){}}
+async function act(a){try{const r=await post('/api/'+a);toast(r.msg||'Done');if(a=='pat'){const b=$('patBtn');b.textContent={happy:'Pat',grumpy:'Pat (he looks annoyed)',angry:'Pat?? (bad idea)',bit:'Ow...',sulking:'Pat (he is sulking)'}[r.mood]||'Pat';b.className=r.mood=='happy'?'alt':'warn';clearTimeout(b._t);b._t=setTimeout(()=>{b.textContent='Pat';b.className='alt'},20000)}poll();if(a=='scan')setTimeout(pollDev,20000)}catch(e){toast('Error: '+e.message)}}
+async function dev(mac,b){await post('/api/device',Object.assign({mac},b));pollDev();poll()}
+function ren(mac){const n=prompt('Name this device:');if(n!==null)dev(mac,{name:n.slice(0,23),known:true})}
+async function devAll(a){await post('/api/devices',{action:a});pollDev();poll()}
+
+async function loadCfg(){const c=await j('/api/settings');$('cName').value=c.name;$('cPing').value=c.ping_host;$('cSs').value=c.sleep_start;$('cSe').value=c.sleep_end;$('cBr').value=c.bright;$('cNb').value=c.night_bright;$('cScan').value=c.scan_min;$('cSlow').value=c.slow_ms;$('cInv').checked=c.bl_invert;
+  if(![...$('cTz').options].some(o=>o.value==c.tz)){const o=new Option('Custom: '+c.tz,c.tz);$('cTz').add(o)}$('cTz').value=c.tz}
+async function saveCfg(){try{await post('/api/settings',{name:$('cName').value,ping_host:$('cPing').value,sleep_start:+$('cSs').value,sleep_end:+$('cSe').value,bright:+$('cBr').value,night_bright:+$('cNb').value,scan_min:+$('cScan').value,slow_ms:+$('cSlow').value,bl_invert:$('cInv').checked,tz:$('cTz').value});toast('Saved');poll()}catch(e){toast('Error: '+e.message)}}
+
+let showWifiCard=false;
+function showWifi(){showWifiCard=true;render();wscan();$('setupCard').scrollIntoView({behavior:'smooth'})}
+async function wscan(){$('ssidSel').innerHTML='<option>scanning...</option>';try{const l=await j('/api/wifiscan');$('ssidSel').innerHTML=l.sort((a,b)=>b.rssi-a.rssi).map(x=>`<option value="${esc(x.ssid)}">${esc(x.ssid)} (${x.rssi} dBm${x.open?', open':''})</option>`).join('')}catch(e){$('ssidSel').innerHTML='<option value="">scan failed</option>'}}
+async function joinWifi(){const ssid=$('ssid').value||$('ssidSel').value;$('wmsg').textContent='Connecting... (up to 15 s)';
+  try{const r=await post('/api/wifi',{ssid,pass:$('pass').value});
+    if(r.ok){$('wmsg').innerHTML=`Connected! Rejoin your normal Wi-Fi and open <b>http://${esc(r.ip)}</b>. The goblin shows the address on screen too.`;setTimeout(()=>post('/api/setup_done').catch(()=>{}),60000)}
+    else $('wmsg').textContent='Could not connect. Check the password and try again.'}catch(e){$('wmsg').textContent='Lost contact - if it connected, the setup hotspot may have closed.'}}
+
+async function upd(){const f=$('fwf').files[0];if(!f)return toast('Pick a .bin first');$('umsg').textContent='Uploading... do not unplug';
+  try{const r=await fetch('/api/update',{method:'POST',body:f});const t=await r.text();$('umsg').textContent=r.ok?'Installed! Rebooting, refresh in ~10 s':'Failed: '+t}catch(e){$('umsg').textContent='Failed: '+e.message}}
+
+poll().then(()=>{if(ST.setup)wscan()});pollDev();loadCfg().catch(()=>{});
+setInterval(poll,3000);setInterval(pollDev,30000);
+</script></body></html>
